@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>smart_meme · 模拟盘监控</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --surface-0: #111110;
+    --surface-1: #1a1a19;
+    --surface-2: #242423;
+    --border:    #33332f;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #8a8980;
+    --good:     #0ca30c;
+    --critical: #d03b3b;
+    --warning:  #fab219;
+    --accent:   #3987e5;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font: 14px/1.5 -apple-system, "SF Pro Text", "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    padding: 24px 20px 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  h1 { font-size: 20px; letter-spacing: .02em; }
+  .badge {
+    font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border);
+    color: var(--text-secondary); text-transform: uppercase;
+  }
+  .badge.live { color: var(--critical); border-color: var(--critical); }
+  .badge.halt { color: var(--warning); border-color: var(--warning); }
+  .updated { color: var(--text-muted); font-size: 12px; margin-left: auto; }
+  .funnel { color: var(--text-muted); font-size: 12px; margin: 2px 0 18px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 26px; }
+  .tile {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .tile .k { font-size: 11px; color: var(--text-muted); letter-spacing: .06em; text-transform: uppercase; }
+  .tile .v { font-size: 22px; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .tile .s { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .pos { color: var(--good); }
+  .neg { color: var(--critical); }
+
+  h2 { font-size: 14px; color: var(--text-secondary); letter-spacing: .05em;
+       text-transform: uppercase; margin: 26px 0 10px; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; }
+  th, td { padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th { font-size: 11px; color: var(--text-muted); letter-spacing: .05em; text-transform: uppercase;
+       border-bottom: 1px solid var(--border); font-weight: 600; }
+  td { border-bottom: 1px solid var(--surface-2); font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  th:first-child, td:first-child { text-align: left; }
+  td.sym { font-weight: 650; }
+  td.reason { text-align: left; color: var(--text-secondary); max-width: 340px;
+              overflow: hidden; text-overflow: ellipsis; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .empty { padding: 18px 14px; color: var(--text-muted); }
+  .note { color: var(--text-muted); font-size: 12px; margin-top: 6px; }
+  .err { color: var(--warning); padding: 12px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>smart_meme</h1>
+  <span class="badge" id="mode">—</span>
+  <span class="badge halt" id="halt" hidden>halted</span>
+  <span class="updated" id="updated">加载中…</span>
+</header>
+<div class="funnel" id="funnel"></div>
+
+<div class="tiles" id="tiles"></div>
+
+<h2>持仓 <span id="posCount"></span></h2>
+<div class="tablewrap"><div id="positions" class="empty">—</div></div>
+
+<h2>当前候选（通过全部过滤）</h2>
+<div class="tablewrap"><div id="candidates" class="empty">—</div></div>
+<p class="note">漏斗是高精度、低召回设计：多数时刻 0 候选是正常状态，说明当下没有值得买的标的。</p>
+
+<h2>最近被拒 Top 25（按 1h 成交量）</h2>
+<div class="tablewrap"><div id="rejects" class="empty">—</div></div>
+
+<div class="err" id="err" hidden></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmtUsd = (v, d = 2) => "$" + Number(v).toLocaleString("en-US",
+  { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtK = v => v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : (v / 1e3).toFixed(0) + "k";
+const fmtPct = v => (v >= 0 ? "+" : "") + Number(v).toFixed(1) + "%";
+const cls = v => v > 0 ? "pos" : v < 0 ? "neg" : "";
+const age = h => h < 0 ? "—" : h < 48 ? h.toFixed(1) + "h" : (h / 24).toFixed(0) + "d";
+const dexUrl = a => `https://dexscreener.com/solana/${a}`;
+const price = p => p >= 1 ? p.toFixed(4) : p.toPrecision(4);
+
+function tile(k, v, vCls = "", s = "") {
+  return `<div class="tile"><div class="k">${k}</div>` +
+         `<div class="v ${vCls}">${v}</div><div class="s">${s}</div></div>`;
+}
+
+function table(headers, rows) {
+  if (!rows.length) return null;
+  return `<table><thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead>` +
+         `<tbody>${rows.join("")}</tbody></table>`;
+}
+
+function setTable(id, html, emptyMsg) {
+  const el = $(id);
+  if (html) { el.className = ""; el.innerHTML = html; }
+  else { el.className = "empty"; el.textContent = emptyMsg; }
+}
+
+function render(d) {
+  const st = d.status || {};
+  const ret = (st.equity / st.starting_cash - 1) * 100;
+  $("mode").textContent = d.mode === "live" ? "LIVE" : "模拟盘 PAPER";
+  $("mode").className = "badge" + (d.mode === "live" ? " live" : "");
+  $("halt").hidden = !(st.killed || st.halted_for_day);
+  $("halt").textContent = st.killed ? "KILL SWITCH" : "日亏熔断";
+  $("updated").textContent = "数据时间 " + new Date(d.ts * 1000).toLocaleString("zh-CN");
+  $("funnel").textContent =
+    `本轮漏斗：发现 ${d.discovered} → 硬过滤 ${d.prefiltered} → 候选 ${(d.candidates || []).length}`;
+
+  const positions = d.positions || [];
+  $("tiles").innerHTML =
+    tile("总权益", fmtUsd(st.equity), cls(ret), fmtPct(ret) + " vs 本金") +
+    tile("现金", fmtUsd(st.cash)) +
+    tile("持仓数", positions.length) +
+    tile("战绩 W/L", `${st.wins} / ${st.losses}`,
+         cls(st.wins - st.losses)) +
+    tile("累计手续费", fmtUsd(st.fees));
+
+  $("posCount").textContent = positions.length ? `(${positions.length})` : "";
+  const posRows = positions.map(p => {
+    const mult = p.last_price / p.entry_price;
+    const pnl = (mult - 1) * 100;
+    const value = p.quantity * p.last_price;
+    return `<tr><td class="sym"><a href="${dexUrl(p.token_address)}" target="_blank" rel="noopener">${p.symbol}</a></td>` +
+      `<td>${price(p.entry_price)}</td><td>${price(p.last_price)}</td>` +
+      `<td class="${cls(pnl)}">${fmtPct(pnl)}</td>` +
+      `<td>${fmtUsd(value)}</td><td>${fmtUsd(p.cost_usd)}</td>` +
+      `<td>${mult.toFixed(2)}x</td><td>${p.moonbag ? "🌙 moonbag" : (p.tp_levels_hit || []).length + " TP"}</td></tr>`;
+  });
+  setTable("positions", table(
+    ["币", "入场价", "现价", "浮盈亏", "市值", "成本", "倍数", "阶段"], posRows),
+    "暂无持仓");
+
+  const candRows = (d.candidates || []).map(c => {
+    const s = c.snapshot;
+    return `<tr><td class="sym"><a href="${dexUrl(s.address)}" target="_blank" rel="noopener">${s.symbol}</a></td>` +
+      `<td>${c.score.toFixed(0)}</td><td>${price(s.price_usd)}</td>` +
+      `<td>${fmtK(s.liquidity_usd)}</td><td>${fmtK(s.market_cap_usd || s.fdv_usd)}</td>` +
+      `<td>${age((s.fetched_at - s.pair_created_at) / 3600)}</td>` +
+      `<td class="${cls(s.price_change_h1)}">${fmtPct(s.price_change_h1)}</td>` +
+      `<td>${(s.buys_h1 / Math.max(1, s.sells_h1)).toFixed(2)}</td></tr>`;
+  });
+  setTable("candidates", table(
+    ["币", "评分", "价格", "流动性", "市值", "币龄", "1h涨跌", "买/卖比"], candRows),
+    "本轮无候选 — 没有标的同时通过流动性、安全与动量检查");
+
+  const rejRows = (d.rejects || []).map(r => {
+    const s = r.snapshot;
+    return `<tr><td class="sym"><a href="${dexUrl(s.address)}" target="_blank" rel="noopener">${s.symbol}</a></td>` +
+      `<td>${fmtK(s.volume_h1)}</td><td>${fmtK(s.liquidity_usd)}</td>` +
+      `<td class="${cls(s.price_change_h1)}">${fmtPct(s.price_change_h1)}</td>` +
+      `<td class="reason" title="${r.reason}">${r.reason}</td></tr>`;
+  });
+  setTable("rejects", table(
+    ["币", "1h成交量", "流动性", "1h涨跌", "拒绝原因"], rejRows), "—");
+}
+
+async function load() {
+  try {
+    const r = await fetch("data.json?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    render(await r.json());
+    $("err").hidden = true;
+  } catch (e) {
+    $("err").hidden = false;
+    $("err").textContent = "数据加载失败：" + e.message + "（bot 可能尚未产出数据）";
+  }
+}
+load();
+setInterval(load, 60_000);
+</script>
+</body>
+</html>
