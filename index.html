@@ -131,8 +131,15 @@ function render(d) {
   $("halt").hidden = !(st.killed || st.halted_for_day);
   $("halt").textContent = st.killed ? "KILL SWITCH" : "日亏熔断";
   $("updated").textContent = "数据时间 " + new Date(d.ts * 1000).toLocaleString("zh-CN");
+  const ch = d.channels || {};
+  const chStr = Object.keys(ch).length
+    ? `　·　通道: boosts ${ch.dexscreener_boosts ?? 0} / profiles ${ch.dexscreener_profiles ?? 0}` +
+      ` / 新池 ${ch.gecko_new_pools ?? 0} / 热门 ${ch.gecko_trending ?? 0}` +
+      ` / jup新币 ${ch.jupiter_recent ?? 0} / 毕业 ${ch.pumpfun_graduations ?? 0}` +
+      `　·　观察池 ${d.watchlist ?? "—"}`
+    : "";
   $("funnel").textContent =
-    `本轮漏斗：发现 ${d.discovered} → 硬过滤 ${d.prefiltered} → 候选 ${(d.candidates || []).length}`;
+    `本轮漏斗：发现 ${d.discovered} → 硬过滤 ${d.prefiltered} → 候选 ${(d.candidates || []).length}${chStr}`;
 
   const positions = d.positions || [];
   $("tiles").innerHTML =
