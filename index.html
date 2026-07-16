@@ -188,6 +188,7 @@ function render(d) {
     return `<tr><td class="sym"><a href="${dexUrl(s.address)}" target="_blank" rel="noopener">${s.symbol}</a></td>` +
       `<td>${gradeNote[c.grade] ?? c.grade ?? "—"}</td>` +
       `<td>${c.score.toFixed(0)}</td>` +
+      `<td>${c.narrative ?? "—"}${c.narrative_strength >= 0.3 ? "🔥" : ""}</td>` +
       `<td>结构${c.structure_hits ?? 0}·传播${c.propagation_hits ?? 0}</td>` +
       `<td>${price(s.price_usd)}</td>` +
       `<td>${fmtK(s.liquidity_usd)}</td><td>${fmtK(s.market_cap_usd || s.fdv_usd)}</td>` +
@@ -196,7 +197,7 @@ function render(d) {
       `<td>${(s.buys_h1 / Math.max(1, s.sells_h1)).toFixed(2)}</td></tr>`;
   });
   setTable("candidates", table(
-    ["币", "等级", "评分", "证据", "价格", "流动性", "市值", "币龄", "1h涨跌", "买/卖比"], candRows),
+    ["币", "等级", "评分", "叙事", "证据", "价格", "流动性", "市值", "币龄", "1h涨跌", "买/卖比"], candRows),
     "本轮无候选 — 没有标的同时通过流动性、安全与动量检查");
 
   const rejRows = (d.rejects || []).map(r => {
