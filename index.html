@@ -83,6 +83,9 @@
 
 <div class="tiles" id="tiles"></div>
 
+<h2>热门叙事（24h 观察池板块热度）</h2>
+<div class="tablewrap"><div id="narratives" class="empty">—</div></div>
+
 <h2>持仓 <span id="posCount"></span></h2>
 <div class="tablewrap"><div id="positions" class="empty">—</div></div>
 
@@ -165,6 +168,19 @@ function render(d) {
   setTable("positions", table(
     ["币", "入场价", "现价", "浮盈亏", "市值", "成本", "倍数", "阶段"], posRows),
     "暂无持仓");
+
+  const heatBar = v => {
+    const filled = Math.round(v * 10);
+    return "█".repeat(filled) + "░".repeat(10 - filled) + " " + v.toFixed(2);
+  };
+  const narRows = (d.narratives || []).map(n =>
+    `<tr><td class="sym">${n.narrative.startsWith("~") ? "🆕 " + n.narrative.slice(1) : n.narrative}</td>` +
+    `<td style="text-align:left;font-family:monospace">${heatBar(n.strength)}</td>` +
+    `<td>${n.tokens}</td><td>${fmtK(n.volume_h1)}</td>` +
+    `<td class="${cls(n.median_h1_pct)}">${fmtPct(n.median_h1_pct)}</td></tr>`);
+  setTable("narratives", table(
+    ["叙事", "热度", "币数", "1h合计成交", "1h涨跌中位"], narRows),
+    "观察池尚未积累足够叙事数据（需要几轮扫描）");
 
   const gradeNote = { S: "S·满仓买", A: "A·6成仓", B: "B·仅观察" };
   const candRows = (d.candidates || []).map(c => {
