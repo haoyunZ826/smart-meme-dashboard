@@ -164,7 +164,7 @@ function render(d) {
   $("posCount").textContent = positions.length ? `(${positions.length})` : "";
   const dd = d.dd_reports || {};
   const ddLink = a => dd[a]
-    ? ` <a href="dd/${dd[a]}" target="_blank" rel="noopener" title="尽调报告">📋</a>` : "";
+    ? ` <a href="dd/${encodeURIComponent(dd[a])}" target="_blank" rel="noopener" title="尽调报告">📋</a>` : "";
   const posRows = positions.map(p => {
     const mult = p.last_price / p.entry_price;
     const pnl = (mult - 1) * 100;
