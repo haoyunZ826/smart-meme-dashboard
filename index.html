@@ -189,7 +189,7 @@ function render(d) {
       `<a href="${dexUrl(m.address)}" target="_blank" rel="noopener" ` +
       `style="display:inline-block;margin:3px 6px 3px 0;padding:2px 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface-2)">` +
       `${m.symbol} <span class="${cls(m.price_change_h1)}">${fmtPct(m.price_change_h1)}</span>` +
-      ` <span style="color:var(--text-muted)">${fmtK(m.volume_h1)}</span></a>`).join("");
+      ` <span style="color:var(--text-muted)">${fmtK(m.volume_h1)}</span></a>${ddLink(m.address)}`).join("");
     const open = narOpen.has(n.narrative);
     return [
       `<tr onclick="toggleNar(${i}, '${n.narrative.replace(/'/g, "")}')" style="cursor:pointer">` +
