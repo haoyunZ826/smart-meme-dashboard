@@ -77,6 +77,10 @@
   <h1>smart_meme</h1>
   <span class="badge" id="mode">—</span>
   <span class="badge halt" id="halt" hidden>halted</span>
+  <span style="display:inline-flex;gap:4px">
+    <button class="badge" id="tabAgg" style="cursor:pointer;background:none" onclick="switchProfile('data.json', this)">⚡ 激进版</button>
+    <button class="badge" id="tabDegen" style="cursor:pointer;background:none" onclick="switchProfile('degen.json', this)">🎰 赌徒版</button>
+  </span>
   <span class="updated" id="updated">加载中…</span>
 </header>
 <div class="funnel" id="funnel"></div>
@@ -136,7 +140,8 @@ function setTable(id, html, emptyMsg) {
 function render(d) {
   const st = d.status || {};
   const ret = (st.equity / st.starting_cash - 1) * 100;
-  $("mode").textContent = d.mode === "live" ? "LIVE" : "模拟盘 PAPER";
+  $("mode").textContent = (d.mode === "live" ? "LIVE" : "模拟盘")
+    + (d.profile === "degen" ? " · 🎰 degen" : " · ⚡ aggressive");
   $("mode").className = "badge" + (d.mode === "live" ? " live" : "");
   $("halt").hidden = !(st.killed || st.halted_for_day);
   $("halt").textContent = st.killed ? "KILL SWITCH" : "日亏熔断";
@@ -234,17 +239,30 @@ function render(d) {
     ["币", "1h成交量", "流动性", "1h涨跌", "拒绝原因"], rejRows), "—");
 }
 
+let dataFile = localStorage.getItem("memebot_profile") || "data.json";
+function markTab() {
+  const active = "border-color:var(--accent);color:var(--accent)";
+  $("tabAgg").style.cssText = "cursor:pointer;background:none;" + (dataFile === "data.json" ? active : "");
+  $("tabDegen").style.cssText = "cursor:pointer;background:none;" + (dataFile === "degen.json" ? active : "");
+}
+window.switchProfile = f => {
+  dataFile = f;
+  localStorage.setItem("memebot_profile", f);
+  markTab();
+  load();
+};
 async function load() {
   try {
-    const r = await fetch("data.json?t=" + Date.now(), { cache: "no-store" });
+    const r = await fetch(dataFile + "?t=" + Date.now(), { cache: "no-store" });
     if (!r.ok) throw new Error("HTTP " + r.status);
     render(await r.json());
     $("err").hidden = true;
   } catch (e) {
     $("err").hidden = false;
-    $("err").textContent = "数据加载失败：" + e.message + "（bot 可能尚未产出数据）";
+    $("err").textContent = "数据加载失败：" + e.message + "（该版本 bot 可能尚未产出数据）";
   }
 }
+markTab();
 load();
 setInterval(load, 60_000);
 </script>
