@@ -97,6 +97,9 @@
 <div class="tablewrap"><div id="candidates" class="empty">—</div></div>
 <p class="note">漏斗是高精度、低召回设计：多数时刻 0 候选是正常状态，说明当下没有值得买的标的。</p>
 
+<h2>历史成交（最近 50 笔）</h2>
+<div class="tablewrap"><div id="trades" class="empty">—</div></div>
+
 <h2>最近被拒 Top 25（按 1h 成交量）</h2>
 <div class="tablewrap"><div id="rejects" class="empty">—</div></div>
 
@@ -228,6 +231,21 @@ function render(d) {
   setTable("candidates", table(
     ["币", "等级", "评分", "叙事", "证据", "价格", "流动性", "市值", "币龄", "1h涨跌", "买/卖比"], candRows),
     "本轮无候选 — 没有标的同时通过流动性、安全与动量检查");
+
+  const fmtTime = ts => new Date(ts * 1000).toLocaleString("zh-CN",
+    { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const reasonCls = r => /stop_loss|rug_alert|kill/.test(r) ? "neg"
+    : /take_profit|trailing/.test(r) ? "pos" : "";
+  const tradeRows = (d.trades || []).map(t =>
+    `<tr><td>${fmtTime(t.timestamp)}</td>` +
+    `<td class="sym"><a href="${dexUrl(t.token_address)}" target="_blank" rel="noopener">${t.symbol}</a></td>` +
+    `<td class="${t.side === "buy" ? "" : "neg"}">${t.side === "buy" ? "买入" : "卖出"}</td>` +
+    `<td>${price(t.price)}</td><td>${fmtUsd(t.usd_value)}</td>` +
+    `<td>${fmtUsd(t.fee_usd)}</td>` +
+    `<td class="reason ${reasonCls(t.reason || "")}" title="${(t.reason || "").replace(/"/g, "")}">${t.reason || ""}</td></tr>`);
+  setTable("trades", table(
+    ["时间", "币", "方向", "价格", "金额", "费用", "原因"], tradeRows),
+    "尚无成交记录");
 
   const rejRows = (d.rejects || []).map(r => {
     const s = r.snapshot;
