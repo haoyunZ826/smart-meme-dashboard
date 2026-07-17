@@ -21,43 +21,44 @@
 <h1>尽调报告: ANSEM (The Black Bull)</h1>
 <ul>
 <li>mint: <code>9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump</code></li>
-<li>生成时间: 2026-07-16 18:00</li>
+<li>生成时间: 2026-07-17 08:00</li>
 <li>来源: 6 个网页 + 链上数据</li>
 </ul>
 <hr />
-<p>这是一份基于您提供的项目材料对 $ANSEM (The Black Bull) 进行的尽职调查报告。</p>
+<p>这份尽职调查报告基于您提供的链上数据及相关项目文档生成。</p>
 <hr />
-<h3>1. 项目概况</h3>
+<h1>$ANSEM (The Black Bull) 尽调报告</h1>
+<h2>1. 项目概况</h2>
 <ul>
-<li><strong>是什么</strong>：$ANSEM 是一个部署在 Solana 链上的 Meme 币，自称为“流动性与指数层”，旨在通过“LP Pods”机制将社区持有的代币转化为协议流动性。</li>
-<li><strong>叙事/主题</strong>：以“The Black Bull”为品牌，利用 Ansem 的个人品牌影响力（但声明与其本人无关联），通过“Delusional Bulls”（妄想公牛）的文化叙事构建一个所谓的金融实验，核心逻辑是“持有者提供流动性以换取交易手续费”。</li>
-<li><strong>社区在哪</strong>：主要集中在 X (Twitter) 和 Telegram (拥有约 8,029 名成员)。</li>
+<li><strong>项目名称</strong>：The Black Bull ($ANSEM)</li>
+<li><strong>定位/叙事</strong>：该项目自称为 Solana 生态创作者经济的“流动性与指数层”。它试图通过“LP Pods”（流动性池）和协议治理机制，将 meme 币叙事转化为社区拥有的流动性，并以此作为后续生态建设的旗帜性资产。</li>
+<li><strong>社区</strong>：主要阵地为 X (Twitter) [source:x] 和 Telegram 群组 [source:telegram]。官方明确声明其为“社区驱动”，且与 KOL Ansem 本人无关联 [source:website]。</li>
 </ul>
-<h3>2. 安全红旗</h3>
+<h2>2. 安全红旗</h2>
 <ul>
-<li><strong>权限管理</strong>：根据链上数据，Mint（铸造）权限和 Freeze（冻结）权限均已关闭，这一点是积极的。</li>
-<li><strong>LP 锁定</strong>：<strong>高风险</strong>。链上数据显示 <code>lp_locked_pct</code> 为 0.0%，即流动性未锁定。</li>
-<li><strong>持仓集中度</strong>：<strong>高风险</strong>。RugCheck 指出存在“单一持有人所有权”和“高持仓集中度”的问题。尽管项目方声称在进行“65% 供应量捕获”的去中心化叙事，但从数据上看，代币分配依然呈现高度集中的态势。</li>
-<li><strong>团队匿名性</strong>：项目方完全匿名，自称为“社区驱动”（Community-Built）。</li>
+<li><strong>Mint/Freeze 权限</strong>：根据链上数据，Mint 权限和 Freeze 权限均已关闭（Inactive），风险较低 [source:snapshot]。</li>
+<li><strong>LP 锁定</strong>：RugCheck 显示 LP 锁定比例为 100% [source:snapshot]，但在另一份数据中显示为 35.24% [source:rugcheck]，存在数据源口径差异，建议以实时链上查询为准。</li>
+<li><strong>持仓集中度</strong>：<strong>存在高风险</strong>。RugCheck 指出存在“单一大户持股”现象（约 58.43%），且持仓高度集中 [source:rugcheck, source:snapshot]。</li>
+<li><strong>Rug 风险</strong>：虽然权限已关闭，但高持仓占比意味着大户抛售可能导致严重的流动性枯竭。</li>
+<li><strong>团队匿名性</strong>：项目团队匿名，但其官网公开了项目技术栈及前端架构，强调非托管和去中心化交互逻辑 [source:website_docs]。</li>
 </ul>
-<h3>3. 资金与流动性</h3>
+<h2>3. 资金与流动性</h2>
 <ul>
-<li><strong>流动性深度</strong>：当前流动性约为 182 万美元，规模尚可。</li>
-<li><strong>成交量真实性</strong>：24 小时交易量约 1,310 万美元，表现活跃，但作为 Meme 币，需警惕刷量（Wash Trading）的可能性。</li>
-<li><strong>买卖盘结构</strong>：项目通过 PumpSwap 和 Meteora DLMM 提供流动性，并提供非托管的 LP Pods 交互界面。由于存在高持仓集中度，若大户抛售，流动性可能迅速枯竭。</li>
+<li><strong>流动性深度</strong>：当前流动性约为 199 万美元 [source:snapshot]，属于较深水平，支撑了约 1000 万美元的 24 小时成交量 [source:snapshot]。</li>
+<li><strong>真实性与结构</strong>：项目方声称通过 PumpSwap 和 Meteora 提供真实流动性，并提供链上看板供用户自行验证 [source:website]。由于其强调“协议拥有流动性（POL）”机制，资金流向相对透明。</li>
+<li><strong>风险点</strong>：买卖盘高度依赖该大户的行为，尽管有协议层面的流动性池，但在极端行情下仍存在显著的价格波动风险。</li>
 </ul>
-<h3>4. 社区与传播</h3>
+<h2>4. 社区与传播</h2>
 <ul>
-<li><strong>社交存在感</strong>：项目拥有相对完善的网站，强调“前端优先、无后端状态”，并提供了一系列工具（如仪表盘、Lambo 计数器）来增强社区参与度。</li>
-<li><strong>内容质量</strong>：叙事包装较为精致，不仅限于单纯的 Meme 传播，还试图通过“Flywheel（飞轮）”逻辑构建所谓的金融架构，具有较强的诱导性。</li>
-<li><strong>社区真实性</strong>：Telegram 活跃人数为 670 人，对于 8,000 人的社群来说活跃度一般，存在潜在的机器人填充嫌疑。</li>
+<li><strong>社交存在感</strong>：在 X 上拥有约 1.95 万关注者，Telegram 拥有 8100+ 成员 [source:x, source:telegram]，社区活跃度处于中高水平。</li>
+<li><strong>内容质量</strong>：官网文档建设较为完善，提供了详细的技术实现说明（无后端状态、非托管交互），比传统 meme 项目更具“协议”感 [source:website_docs]。</li>
+<li><strong>机器人风险</strong>：虽然社区规模可观，但 meme 项目普遍存在机器人刷量现象，目前无法排除社区中存在大量僵尸账户的可能性。</li>
 </ul>
-<h3>5. 结论</h3>
+<h2>5. 结论</h2>
 <p><strong>评级：谨慎观察</strong></p>
 <p><strong>理由：</strong>
-1. 虽然项目代码层面（Mint/Freeze）排除了基础 Rug 风险，但 <strong>LP 未锁定</strong>且<strong>持仓极度集中</strong>，赋予了庄家随时撤池或抛售的极大权力。
-2. 该项目具有明显的 Meme 投机属性，所谓的“金融实验”包装极易诱导散户参与 LP 提供以换取手续费，但流动性提供者需同时承担无常损失与大户砸盘的双重风险。
-3. 建议仅作为高风险资产配置，切勿将其视为“投资”或“基础设施”，需时刻监控大户地址的动向。</p>
-<hr />
-<p><em>免责声明：以上报告仅供研究参考，不构成任何投资建议。加密货币市场波动巨大，Meme 币存在极高风险，请务必 DYOR (Do Your Own Research)。</em></p>
+1.  <strong>叙事创新</strong>：该项目通过引入流动性池机制（LP Pods）和协议化运营，试图摆脱单纯的 meme 炒作，具备一定的长期建设逻辑。
+2.  <strong>技术透明</strong>：项目公开了技术架构，且交互方式完全通过非托管钱包进行，安全设计符合 DeFi 标准，并非典型的“土狗”欺诈盘。
+3.  <strong>持仓隐忧</strong>：超过 58% 的单一大户持股比例是巨大的不稳定因素，极易触发剧烈的价格波动或潜在的撤池风险，参与前需严密监测大户钱包动向。</p>
+<p><em>免责声明：本报告仅供参考，不构成任何财务建议。加密货币市场波动极大，高风险资产需自行承担损失。</em></p>
 </body></html>
