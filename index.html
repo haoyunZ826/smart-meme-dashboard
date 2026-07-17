@@ -154,8 +154,9 @@ function render(d) {
       ` / helius新池 ${ch.helius_new_pools ?? 0}` +
       `　·　观察池 ${d.watchlist ?? "—"}`
     : "";
+  const tradeable = d.tradeable != null ? `（可交易 ${d.tradeable}，其余为曲线期）` : "";
   $("funnel").textContent =
-    `本轮漏斗：发现 ${d.discovered} → 硬过滤 ${d.prefiltered} → 候选 ${(d.candidates || []).length}${chStr}`;
+    `本轮漏斗：发现 ${d.discovered}${tradeable} → 硬过滤 ${d.prefiltered} → 候选 ${(d.candidates || []).length}${chStr}`;
 
   const positions = d.positions || [];
   $("tiles").innerHTML =
