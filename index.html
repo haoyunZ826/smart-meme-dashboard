@@ -154,7 +154,7 @@ function render(d) {
     ? `　·　通道: boosts ${ch.dexscreener_boosts ?? 0} / profiles ${ch.dexscreener_profiles ?? 0}` +
       ` / 新池 ${ch.gecko_new_pools ?? 0} / 热门 ${ch.gecko_trending ?? 0}` +
       ` / jup新币 ${ch.jupiter_recent ?? 0} / 毕业 ${ch.pumpfun_graduations ?? 0}` +
-      ` / helius新池 ${ch.helius_new_pools ?? 0}` +
+      ` / helius新池 ${ch.helius_new_pools ?? 0} / KOL喊单 ${ch.kol_x ?? 0}` +
       `　·　观察池 ${d.watchlist ?? "—"}`
     : "";
   const tradeable = d.tradeable != null ? `（可交易 ${d.tradeable}，其余为曲线期）` : "";
