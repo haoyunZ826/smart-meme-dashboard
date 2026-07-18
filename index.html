@@ -120,7 +120,9 @@ const fmtK = v => v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : (v / 1e3).toFixed(0) +
 const fmtPct = v => (v >= 0 ? "+" : "") + Number(v).toFixed(1) + "%";
 const cls = v => v > 0 ? "pos" : v < 0 ? "neg" : "";
 const age = h => h < 0 ? "—" : h < 48 ? h.toFixed(1) + "h" : (h / 24).toFixed(0) + "d";
-const dexUrl = a => `https://dexscreener.com/solana/${a}`;
+const dexUrl = (a, chain) => `https://dexscreener.com/${chain || "solana"}/${a}`;
+const chainTag = c => (c && c !== "solana")
+  ? ` <span style="color:var(--text-muted);font-size:10px">·${c}</span>` : "";
 const price = p => p >= 1 ? p.toFixed(4) : p.toPrecision(4);
 
 function tile(k, v, vCls = "", s = "") {
@@ -178,7 +180,7 @@ function render(d) {
     const mult = p.last_price / p.entry_price;
     const pnl = (mult - 1) * 100;
     const value = p.quantity * p.last_price;
-    return `<tr><td class="sym"><a href="${dexUrl(p.token_address)}" target="_blank" rel="noopener">${p.symbol}</a>${ddLink(p.token_address)}</td>` +
+    return `<tr><td class="sym"><a href="${dexUrl(p.token_address, p.chain)}" target="_blank" rel="noopener">${p.symbol}</a>${chainTag(p.chain)}${ddLink(p.token_address)}</td>` +
       `<td>${price(p.entry_price)}</td><td>${price(p.last_price)}</td>` +
       `<td class="${cls(pnl)}">${fmtPct(pnl)}</td>` +
       `<td>${fmtUsd(value)}</td><td>${fmtUsd(p.cost_usd)}</td>` +
@@ -217,7 +219,7 @@ function render(d) {
   const gradeNote = { S: "S·满仓买", A: "A·6成仓", B: "B·仅观察" };
   const candRows = (d.candidates || []).map(c => {
     const s = c.snapshot;
-    return `<tr><td class="sym"><a href="${dexUrl(s.address)}" target="_blank" rel="noopener">${s.symbol}</a>${ddLink(s.address)}</td>` +
+    return `<tr><td class="sym"><a href="${dexUrl(s.address, s.chain)}" target="_blank" rel="noopener">${s.symbol}</a>${chainTag(s.chain)}${ddLink(s.address)}</td>` +
       `<td>${gradeNote[c.grade] ?? c.grade ?? "—"}</td>` +
       `<td>${c.score.toFixed(0)}</td>` +
       `<td>${c.narrative ?? "—"}${c.narrative_strength >= 0.3 ? "🔥" : ""}</td>` +
