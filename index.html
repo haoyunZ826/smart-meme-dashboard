@@ -197,9 +197,9 @@ function render(d) {
   const narRows = (d.narratives || []).flatMap((n, i) => {
     const label = n.narrative.startsWith("~") ? "🆕 " + n.narrative.slice(1) : n.narrative;
     const chips = (n.members || []).map(m =>
-      `<a href="${dexUrl(m.address)}" target="_blank" rel="noopener" ` +
+      `<a href="${dexUrl(m.address, m.chain)}" target="_blank" rel="noopener" ` +
       `style="display:inline-block;margin:3px 6px 3px 0;padding:2px 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface-2)">` +
-      `${m.symbol} <span class="${cls(m.price_change_h1)}">${fmtPct(m.price_change_h1)}</span>` +
+      `${m.symbol}${chainTag(m.chain)} <span class="${cls(m.price_change_h1)}">${fmtPct(m.price_change_h1)}</span>` +
       ` <span style="color:var(--text-muted)">${fmtK(m.volume_h1)}</span></a>${ddLink(m.address)}`).join("");
     const open = narOpen.has(n.narrative);
     return [
@@ -240,7 +240,7 @@ function render(d) {
     : /take_profit|trailing/.test(r) ? "pos" : "";
   const tradeRows = (d.trades || []).map(t =>
     `<tr><td>${fmtTime(t.timestamp)}</td>` +
-    `<td class="sym"><a href="${dexUrl(t.token_address)}" target="_blank" rel="noopener">${t.symbol}</a></td>` +
+    `<td class="sym"><a href="${dexUrl(t.token_address, t.chain)}" target="_blank" rel="noopener">${t.symbol}</a>${chainTag(t.chain)}</td>` +
     `<td class="${t.side === "buy" ? "" : "neg"}">${t.side === "buy" ? "买入" : "卖出"}</td>` +
     `<td>${price(t.price)}</td><td>${fmtUsd(t.usd_value)}</td>` +
     `<td>${fmtUsd(t.fee_usd)}</td>` +
@@ -251,7 +251,7 @@ function render(d) {
 
   const rejRows = (d.rejects || []).map(r => {
     const s = r.snapshot;
-    return `<tr><td class="sym"><a href="${dexUrl(s.address)}" target="_blank" rel="noopener">${s.symbol}</a></td>` +
+    return `<tr><td class="sym"><a href="${dexUrl(s.address, s.chain)}" target="_blank" rel="noopener">${s.symbol}</a>${chainTag(s.chain)}</td>` +
       `<td>${fmtK(s.volume_h1)}</td><td>${fmtK(s.liquidity_usd)}</td>` +
       `<td class="${cls(s.price_change_h1)}">${fmtPct(s.price_change_h1)}</td>` +
       `<td class="reason" title="${r.reason}">${r.reason}</td></tr>`;
