@@ -80,6 +80,7 @@
   <span style="display:inline-flex;gap:4px">
     <button class="badge" id="tabAgg" style="cursor:pointer;background:none" onclick="switchProfile('data.json', this)">⚡ 激进版</button>
     <button class="badge" id="tabDegen" style="cursor:pointer;background:none" onclick="switchProfile('degen.json', this)">🎰 赌徒版</button>
+    <button class="badge" id="tabBn" style="cursor:pointer;background:none" onclick="switchProfile('bn.json', this)">📈 币安永续</button>
   </span>
   <span class="updated" id="updated">加载中…</span>
 </header>
@@ -145,8 +146,14 @@ function setTable(id, html, emptyMsg) {
 function render(d) {
   const st = d.status || {};
   const ret = (st.equity / st.starting_cash - 1) * 100;
+  const isPerp = d.venue === "binance-perp";
+  // match on prefix, not equality: profile carries a version suffix
+  // ("degen-v2.3"), which silently made the degen book render as aggressive
+  const prof = d.profile || "";
   $("mode").textContent = (d.mode === "live" ? "LIVE" : "模拟盘")
-    + (d.profile === "degen" ? " · 🎰 degen" : " · ⚡ aggressive");
+    + (isPerp ? ` · 📈 ${prof || "币安永续"}`
+      : prof.startsWith("degen") ? ` · 🎰 ${prof}`
+      : ` · ⚡ ${prof || "aggressive"}`);
   $("mode").className = "badge" + (d.mode === "live" ? " live" : "");
   $("halt").hidden = !(st.killed || st.halted_for_day);
   $("halt").textContent = st.killed ? "KILL SWITCH" : "日亏熔断";
@@ -160,8 +167,12 @@ function render(d) {
       `　·　观察池 ${d.watchlist ?? "—"}`
     : "";
   const tradeable = d.tradeable != null ? `（可交易 ${d.tradeable}，其余为曲线期）` : "";
-  $("funnel").textContent =
-    `本轮漏斗：发现 ${d.discovered}${tradeable} → 硬过滤 ${d.prefiltered} → 候选 ${(d.candidates || []).length}${chStr}`;
+  // the perp book has no on-chain discovery funnel; show its own two signal
+  // sources instead of leaving the strip reading "发现 undefined"
+  $("funnel").textContent = isPerp
+    ? `信号源：广场热度 ${(d.heat || []).length} 个 ticker　·　合格带单员 ${d.leaders_qualified ?? "—"} 个`
+      + `（30日ROI>0 + AUM>$5万 + 回撤<40%）　·　候选 ${(d.candidates || []).length}`
+    : `本轮漏斗：发现 ${d.discovered}${tradeable} → 硬过滤 ${d.prefiltered} → 候选 ${(d.candidates || []).length}${chStr}`;
 
   const positions = d.positions || [];
   $("tiles").innerHTML =
@@ -180,7 +191,11 @@ function render(d) {
     const mult = p.last_price / p.entry_price;
     const pnl = (mult - 1) * 100;
     const value = p.quantity * p.last_price;
-    return `<tr><td class="sym"><a href="${dexUrl(p.token_address, p.chain)}" target="_blank" rel="noopener">${p.symbol}</a>${chainTag(p.chain)}${ddLink(p.token_address)}</td>` +
+    // perp symbols are exchange tickers, not mints — link to the Binance chart
+    const symCell = isPerp
+      ? `<a href="https://www.binance.com/zh-CN/futures/${p.symbol}" target="_blank" rel="noopener">${p.symbol}</a>`
+      : `<a href="${dexUrl(p.token_address, p.chain)}" target="_blank" rel="noopener">${p.symbol}</a>${chainTag(p.chain)}${ddLink(p.token_address)}`;
+    return `<tr><td class="sym">${symCell}</td>` +
       `<td>${price(p.entry_price)}</td><td>${price(p.last_price)}</td>` +
       `<td class="${cls(pnl)}">${fmtPct(pnl)}</td>` +
       `<td>${fmtUsd(value)}</td><td>${fmtUsd(p.cost_usd)}</td>` +
@@ -194,7 +209,16 @@ function render(d) {
     const filled = Math.round(v * 10);
     return "█".repeat(filled) + "░".repeat(10 - filled) + " " + v.toFixed(2);
   };
-  const narRows = (d.narratives || []).flatMap((n, i) => {
+  // the perp book's equivalent of narratives is Square ticker heat: a flat
+  // frequency list, no member coins to expand
+  if (isPerp) {
+    document.querySelector("h2").textContent = "币安广场热度（ticker 提及频次）";
+    const heatRows = (d.heat || []).map(([sym, n]) =>
+      `<tr><td class="sym">$${sym}</td><td>${n}</td></tr>`);
+    setTable("narratives", table(["Ticker", "提及次数"], heatRows),
+             "本轮未抓到广场热度");
+  }
+  const narRows = isPerp ? [] : (d.narratives || []).flatMap((n, i) => {
     const label = n.narrative.startsWith("~") ? "🆕 " + n.narrative.slice(1) : n.narrative;
     const chips = (n.members || []).map(m =>
       `<a href="${dexUrl(m.address, m.chain)}" target="_blank" rel="noopener" ` +
@@ -212,12 +236,23 @@ function render(d) {
       (chips || '<span style="color:var(--text-muted)">无成员数据</span>') + `</td></tr>`,
     ];
   });
-  setTable("narratives", table(
+  if (!isPerp) setTable("narratives", table(
     ["叙事（点击展开成员币）", "热度", "币数", "1h合计成交", "1h涨跌中位"], narRows),
     "观察池尚未积累足够叙事数据（需要几轮扫描）");
 
   const gradeNote = { S: "S·满仓买", A: "A·6成仓", B: "B·仅观察" };
-  const candRows = (d.candidates || []).map(c => {
+  // perp candidates carry a different shape entirely (range/heat/OI instead of
+  // pool depth/age), so they get their own columns rather than empty cells
+  const candRows = isPerp ? (d.candidates || []).map(c =>
+      `<tr><td class="sym">${c.symbol}</td>` +
+      `<td>${c.score.toFixed(0)}</td>` +
+      `<td class="${cls(c.chg_24h)}">${fmtPct(c.chg_24h)}</td>` +
+      `<td>${(c.range_pct ?? 0).toFixed(0)}%</td>` +
+      `<td>${c.heat || "—"}</td>` +
+      `<td class="${cls(c.oi_change_pct)}">${fmtPct(c.oi_change_pct)}</td>` +
+      `<td>${fmtK(c.quote_vol)}</td>` +
+      `<td style="text-align:left">${(c.reasons || []).join("; ")}</td></tr>`)
+    : (d.candidates || []).map(c => {
     const s = c.snapshot;
     return `<tr><td class="sym"><a href="${dexUrl(s.address, s.chain)}" target="_blank" rel="noopener">${s.symbol}</a>${chainTag(s.chain)}${ddLink(s.address)}</td>` +
       `<td>${gradeNote[c.grade] ?? c.grade ?? "—"}</td>` +
@@ -230,9 +265,11 @@ function render(d) {
       `<td class="${cls(s.price_change_h1)}">${fmtPct(s.price_change_h1)}</td>` +
       `<td>${(s.buys_h1 / Math.max(1, s.sells_h1)).toFixed(2)}</td></tr>`;
   });
-  setTable("candidates", table(
-    ["币", "等级", "评分", "叙事", "证据", "价格", "流动性", "市值", "币龄", "1h涨跌", "买/卖比"], candRows),
-    "本轮无候选 — 没有标的同时通过流动性、安全与动量检查");
+  setTable("candidates", isPerp
+    ? table(["标的", "评分", "24h涨跌", "振幅", "广场热度", "OI变化", "24h成交额", "理由"], candRows)
+    : table(["币", "等级", "评分", "叙事", "证据", "价格", "流动性", "市值", "币龄", "1h涨跌", "买/卖比"], candRows),
+    isPerp ? "本轮无候选 — 没有标的同时通过方向门、波动与热度检查"
+           : "本轮无候选 — 没有标的同时通过流动性、安全与动量检查");
 
   const fmtTime = ts => new Date(ts * 1000).toLocaleString("zh-CN",
     { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -249,15 +286,17 @@ function render(d) {
     ["时间", "币", "方向", "价格", "金额", "费用", "原因"], tradeRows),
     "尚无成交记录");
 
-  const rejRows = (d.rejects || []).map(r => {
+  const rejRows = isPerp ? [] : (d.rejects || []).map(r => {
     const s = r.snapshot;
     return `<tr><td class="sym"><a href="${dexUrl(s.address, s.chain)}" target="_blank" rel="noopener">${s.symbol}</a>${chainTag(s.chain)}</td>` +
       `<td>${fmtK(s.volume_h1)}</td><td>${fmtK(s.liquidity_usd)}</td>` +
       `<td class="${cls(s.price_change_h1)}">${fmtPct(s.price_change_h1)}</td>` +
       `<td class="reason" title="${r.reason}">${r.reason}</td></tr>`;
   });
+  // no reject feed on the perp venue — the funnel scores everything it sees
   setTable("rejects", table(
-    ["币", "1h成交量", "流动性", "1h涨跌", "拒绝原因"], rejRows), "—");
+    ["币", "1h成交量", "流动性", "1h涨跌", "拒绝原因"], isPerp ? [] : rejRows),
+    isPerp ? "币安永续账本无落选榜（筛选器对全部标的评分，不做硬拒绝）" : "—");
 }
 
 let dataFile = localStorage.getItem("memebot_profile") || "data.json";
@@ -265,6 +304,7 @@ function markTab() {
   const active = "border-color:var(--accent);color:var(--accent)";
   $("tabAgg").style.cssText = "cursor:pointer;background:none;" + (dataFile === "data.json" ? active : "");
   $("tabDegen").style.cssText = "cursor:pointer;background:none;" + (dataFile === "degen.json" ? active : "");
+  $("tabBn").style.cssText = "cursor:pointer;background:none;" + (dataFile === "bn.json" ? active : "");
 }
 window.switchProfile = f => {
   dataFile = f;
