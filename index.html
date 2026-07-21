@@ -80,7 +80,9 @@
   <span style="display:inline-flex;gap:4px">
     <button class="badge" id="tabAgg" style="cursor:pointer;background:none" onclick="switchProfile('data.json', this)">⚡ 激进版</button>
     <button class="badge" id="tabDegen" style="cursor:pointer;background:none" onclick="switchProfile('degen.json', this)">🎰 赌徒版</button>
-    <button class="badge" id="tabBn" style="cursor:pointer;background:none" onclick="switchProfile('bn.json', this)">📈 币安永续</button>
+    <button class="badge" id="tabBn" style="cursor:pointer;background:none" onclick="switchProfile('bn.json', this)">🛡 币安保守</button>
+    <button class="badge" id="tabBnA" style="cursor:pointer;background:none" onclick="switchProfile('bnaggr.json', this)">⚡ 币安激进</button>
+    <button class="badge" id="tabBnD" style="cursor:pointer;background:none" onclick="switchProfile('bndegen.json', this)">🎰 币安赌徒</button>
   </span>
   <span class="updated" id="updated">加载中…</span>
 </header>
@@ -305,6 +307,8 @@ function markTab() {
   $("tabAgg").style.cssText = "cursor:pointer;background:none;" + (dataFile === "data.json" ? active : "");
   $("tabDegen").style.cssText = "cursor:pointer;background:none;" + (dataFile === "degen.json" ? active : "");
   $("tabBn").style.cssText = "cursor:pointer;background:none;" + (dataFile === "bn.json" ? active : "");
+  $("tabBnA").style.cssText = "cursor:pointer;background:none;" + (dataFile === "bnaggr.json" ? active : "");
+  $("tabBnD").style.cssText = "cursor:pointer;background:none;" + (dataFile === "bndegen.json" ? active : "");
 }
 window.switchProfile = f => {
   dataFile = f;
