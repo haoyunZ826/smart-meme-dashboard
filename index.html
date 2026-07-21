@@ -201,14 +201,22 @@ function render(d) {
     const symCell = isPerp
       ? `<a href="https://www.binance.com/zh-CN/futures/${p.symbol}" target="_blank" rel="noopener">${p.symbol}</a>`
       : `<a href="${dexUrl(p.token_address, p.chain)}" target="_blank" rel="noopener">${p.symbol}</a>${chainTag(p.chain)}${ddLink(p.token_address)}`;
-    return `<tr><td class="sym">${symCell}</td>` +
+    // With leverage the price move understates what the account actually feels:
+    // a 3x position showing -0.08% has really lost 0.23% of its margin. Report
+    // the margin-basis PnL and the margin posted, not the borrowed notional.
+    const lev = p.leverage || 1;
+    const margin = p.margin_usd || p.cost_usd;
+    const marginPnl = pnl * lev;
+    const levTag = lev > 1
+      ? ` <span style="color:var(--warning);font-size:10px">${lev}x</span>` : "";
+    return `<tr><td class="sym">${symCell}${levTag}</td>` +
       `<td>${price(p.entry_price)}</td><td>${price(p.last_price)}</td>` +
-      `<td class="${cls(pnl)}">${fmtPct(pnl)}</td>` +
-      `<td>${fmtUsd(value)}</td><td>${fmtUsd(p.cost_usd)}</td>` +
+      `<td class="${cls(marginPnl)}">${fmtPct(marginPnl)}</td>` +
+      `<td>${fmtUsd(value)}</td><td>${fmtUsd(margin)}</td>` +
       `<td>${mult.toFixed(2)}x</td><td>${p.moonbag ? "🌙 moonbag" : (p.tp_levels_hit || []).length + " TP"}</td></tr>`;
   });
   setTable("positions", table(
-    ["币", "入场价", "现价", "浮盈亏", "市值", "成本", "倍数", "阶段"], posRows),
+    ["币", "入场价", "现价", "浮盈亏(保证金)", "名义", "保证金", "价格倍数", "阶段"], posRows),
     "暂无持仓");
 
   const heatBar = v => {
