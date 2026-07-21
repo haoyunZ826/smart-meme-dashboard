@@ -38,6 +38,7 @@
   }
   .badge.live { color: var(--critical); border-color: var(--critical); }
   .badge.halt { color: var(--warning); border-color: var(--warning); }
+  .badge.archived { opacity: .5; }
   .updated { color: var(--text-muted); font-size: 12px; margin-left: auto; }
   .funnel { color: var(--text-muted); font-size: 12px; margin: 2px 0 18px; }
 
@@ -78,11 +79,12 @@
   <span class="badge" id="mode">—</span>
   <span class="badge halt" id="halt" hidden>halted</span>
   <span style="display:inline-flex;gap:4px">
-    <button class="badge" id="tabAgg" style="cursor:pointer;background:none" onclick="switchProfile('data.json', this)">⚡ 激进版</button>
-    <button class="badge" id="tabDegen" style="cursor:pointer;background:none" onclick="switchProfile('degen.json', this)">🎰 赌徒版</button>
-    <button class="badge" id="tabBn" style="cursor:pointer;background:none" onclick="switchProfile('bn.json', this)">🛡 币安保守</button>
-    <button class="badge" id="tabBnA" style="cursor:pointer;background:none" onclick="switchProfile('bnaggr.json', this)">⚡ 币安激进</button>
-    <button class="badge" id="tabBnD" style="cursor:pointer;background:none" onclick="switchProfile('bndegen.json', this)">🎰 币安赌徒</button>
+    <button class="badge" id="tabBn" style="cursor:pointer;background:none" onclick="switchProfile('bn.json', this)">🛡 保守</button>
+    <button class="badge" id="tabBnA" style="cursor:pointer;background:none" onclick="switchProfile('bnaggr.json', this)">⚡ 激进</button>
+    <button class="badge" id="tabBnD" style="cursor:pointer;background:none" onclick="switchProfile('bndegen.json', this)">🎰 赌徒</button>
+    <span style="width:10px"></span>
+    <button class="badge archived" id="tabAgg" style="cursor:pointer;background:none" onclick="switchProfile('data.json', this)">⚡ 链上·存档</button>
+    <button class="badge archived" id="tabDegen" style="cursor:pointer;background:none" onclick="switchProfile('degen.json', this)">🎰 链上·存档</button>
   </span>
   <span class="updated" id="updated">加载中…</span>
 </header>
@@ -159,7 +161,9 @@ function render(d) {
   $("mode").className = "badge" + (d.mode === "live" ? " live" : "");
   $("halt").hidden = !(st.killed || st.halted_for_day);
   $("halt").textContent = st.killed ? "KILL SWITCH" : "日亏熔断";
-  $("updated").textContent = "数据时间 " + new Date(d.ts * 1000).toLocaleString("zh-CN");
+  const archived = ARCHIVED.includes(dataFile);
+  $("updated").textContent = (archived ? "⏹ 已停机 · 数据停在 " : "数据时间 ")
+    + new Date(d.ts * 1000).toLocaleString("zh-CN");
   const ch = d.channels || {};
   const chStr = Object.keys(ch).length
     ? `　·　通道: boosts ${ch.dexscreener_boosts ?? 0} / profiles ${ch.dexscreener_profiles ?? 0}` +
@@ -301,7 +305,12 @@ function render(d) {
     isPerp ? "币安永续账本无落选榜（筛选器对全部标的评分，不做硬拒绝）" : "—");
 }
 
-let dataFile = localStorage.getItem("memebot_profile") || "data.json";
+const LIVE = ["bn.json", "bnaggr.json", "bndegen.json"];
+const ARCHIVED = ["data.json", "degen.json"];
+// the on-chain books were stopped 2026-07-20; a returning visitor whose stored
+// tab points at one would otherwise land on a book that never updates again
+let dataFile = localStorage.getItem("memebot_profile") || "bn.json";
+if (!LIVE.includes(dataFile) && !ARCHIVED.includes(dataFile)) dataFile = "bn.json";
 function markTab() {
   const active = "border-color:var(--accent);color:var(--accent)";
   $("tabAgg").style.cssText = "cursor:pointer;background:none;" + (dataFile === "data.json" ? active : "");
