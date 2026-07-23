@@ -82,6 +82,7 @@
     <button class="badge" id="tabBn" style="cursor:pointer;background:none" onclick="switchProfile('bn.json', this)">🛡 保守</button>
     <button class="badge" id="tabBnA" style="cursor:pointer;background:none" onclick="switchProfile('bnaggr.json', this)">⚡ 激进</button>
     <button class="badge" id="tabBnD" style="cursor:pointer;background:none" onclick="switchProfile('bndegen.json', this)">🎰 赌徒</button>
+    <button class="badge" id="tabRh" style="cursor:pointer;background:none" onclick="switchProfile('rh.json', this)">🏹 RH链</button>
     <span style="width:10px"></span>
     <button class="badge archived" id="tabAgg" style="cursor:pointer;background:none" onclick="switchProfile('data.json', this)">⚡ 链上·存档</button>
     <button class="badge archived" id="tabDegen" style="cursor:pointer;background:none" onclick="switchProfile('degen.json', this)">🎰 链上·存档</button>
@@ -313,7 +314,7 @@ function render(d) {
     isPerp ? "币安永续账本无落选榜（筛选器对全部标的评分，不做硬拒绝）" : "—");
 }
 
-const LIVE = ["bn.json", "bnaggr.json", "bndegen.json"];
+const LIVE = ["bn.json", "bnaggr.json", "bndegen.json", "rh.json"];
 const ARCHIVED = ["data.json", "degen.json"];
 // the on-chain books were stopped 2026-07-20; a returning visitor whose stored
 // tab points at one would otherwise land on a book that never updates again
@@ -326,6 +327,7 @@ function markTab() {
   $("tabBn").style.cssText = "cursor:pointer;background:none;" + (dataFile === "bn.json" ? active : "");
   $("tabBnA").style.cssText = "cursor:pointer;background:none;" + (dataFile === "bnaggr.json" ? active : "");
   $("tabBnD").style.cssText = "cursor:pointer;background:none;" + (dataFile === "bndegen.json" ? active : "");
+  $("tabRh").style.cssText = "cursor:pointer;background:none;" + (dataFile === "rh.json" ? active : "");
 }
 window.switchProfile = f => {
   dataFile = f;
