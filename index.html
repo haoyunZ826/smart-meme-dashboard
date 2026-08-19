@@ -83,6 +83,7 @@
     <button class="badge" id="tabBnA" style="cursor:pointer;background:none" onclick="switchProfile('bnaggr.json', this)">⚡ 激进</button>
     <button class="badge" id="tabBnD" style="cursor:pointer;background:none" onclick="switchProfile('bndegen.json', this)">🎰 赌徒</button>
     <button class="badge" id="tabRh" style="cursor:pointer;background:none" onclick="switchProfile('rh.json', this)">🏹 RH链</button>
+    <button class="badge" id="tabMai" style="cursor:pointer;background:none" onclick="switchProfile('mai.json', this)">🎭 盘口</button>
     <span style="width:10px"></span>
     <button class="badge archived" id="tabAgg" style="cursor:pointer;background:none" onclick="switchProfile('data.json', this)">⚡ 链上·存档</button>
     <button class="badge archived" id="tabDegen" style="cursor:pointer;background:none" onclick="switchProfile('degen.json', this)">🎰 链上·存档</button>
@@ -166,11 +167,18 @@ function render(d) {
   $("updated").textContent = (archived ? "⏹ 已停机 · 数据停在 " : "数据时间 ")
     + new Date(d.ts * 1000).toLocaleString("zh-CN");
   const ch = d.channels || {};
+  // 只列这一轮**实际启用**的通道。写死全部九个的老版本在 mai 账本上全显示 0
+  // （它只开 gmgn_rank 一条），读起来像 feed 坏了
+  const CH_LABEL = {
+    dexscreener_boosts: "boosts", dexscreener_profiles: "profiles",
+    gecko_new_pools: "新池", gecko_trending: "热门",
+    jupiter_recent: "jup新币", pumpfun_graduations: "毕业",
+    helius_new_pools: "helius新池", kol_x: "KOL喊单", square: "广场",
+    gmgn_rank: "GMGN榜",
+  };
   const chStr = Object.keys(ch).length
-    ? `　·　通道: boosts ${ch.dexscreener_boosts ?? 0} / profiles ${ch.dexscreener_profiles ?? 0}` +
-      ` / 新池 ${ch.gecko_new_pools ?? 0} / 热门 ${ch.gecko_trending ?? 0}` +
-      ` / jup新币 ${ch.jupiter_recent ?? 0} / 毕业 ${ch.pumpfun_graduations ?? 0}` +
-      ` / helius新池 ${ch.helius_new_pools ?? 0} / KOL喊单 ${ch.kol_x ?? 0} / 广场 ${ch.square ?? 0}` +
+    ? `　·　通道: ` + Object.keys(ch)
+        .map(k => `${CH_LABEL[k] || k} ${ch[k] ?? 0}`).join(" / ") +
       `　·　观察池 ${d.watchlist ?? "—"}`
     : "";
   const tradeable = d.tradeable != null ? `（可交易 ${d.tradeable}，其余为曲线期）` : "";
@@ -256,6 +264,10 @@ function render(d) {
     "观察池尚未积累足够叙事数据（需要几轮扫描）");
 
   const gradeNote = { S: "S·满仓买", A: "A·6成仓", B: "B·仅观察" };
+  // 盘口画像（麦总方法论，见引擎 tablekind.py）。只有 mai 账本会填这个字段，
+  // 其余账本落 undefined —— 显示 "—" 而不是空白，免得看起来像渲染坏了
+  const KIND = { mm: "🎩庄盘", pvp: "⚔️PVP", abandoned: "💀弃盘", unknown: "？未知" };
+  const kindNote = c => (c.second_leg ? "🔁二段 " : "") + (KIND[c.table_kind] || "—");
   // perp candidates carry a different shape entirely (range/heat/OI instead of
   // pool depth/age), so they get their own columns rather than empty cells
   const candRows = isPerp ? (d.candidates || []).map(c =>
@@ -272,6 +284,7 @@ function render(d) {
     return `<tr><td class="sym"><a href="${dexUrl(s.address, s.chain)}" target="_blank" rel="noopener">${s.symbol}</a>${chainTag(s.chain)}${ddLink(s.address)}</td>` +
       `<td>${gradeNote[c.grade] ?? c.grade ?? "—"}</td>` +
       `<td>${c.score.toFixed(0)}</td>` +
+      `<td>${kindNote(c)}</td>` +
       `<td>${c.narrative ?? "—"}${c.narrative_strength >= 0.3 ? "🔥" : ""}</td>` +
       `<td>结构${c.structure_hits ?? 0}·传播${c.propagation_hits ?? 0}</td>` +
       `<td>${price(s.price_usd)}</td>` +
@@ -282,7 +295,7 @@ function render(d) {
   });
   setTable("candidates", isPerp
     ? table(["标的", "评分", "24h涨跌", "振幅", "广场热度", "OI变化", "24h成交额", "理由"], candRows)
-    : table(["币", "等级", "评分", "叙事", "证据", "价格", "流动性", "市值", "币龄", "1h涨跌", "买/卖比"], candRows),
+    : table(["币", "等级", "评分", "盘口", "叙事", "证据", "价格", "流动性", "市值", "币龄", "1h涨跌", "买/卖比"], candRows),
     isPerp ? "本轮无候选 — 没有标的同时通过方向门、波动与热度检查"
            : "本轮无候选 — 没有标的同时通过流动性、安全与动量检查");
 
@@ -314,7 +327,7 @@ function render(d) {
     isPerp ? "币安永续账本无落选榜（筛选器对全部标的评分，不做硬拒绝）" : "—");
 }
 
-const LIVE = ["bn.json", "bnaggr.json", "bndegen.json", "rh.json"];
+const LIVE = ["bn.json", "bnaggr.json", "bndegen.json", "rh.json", "mai.json"];
 const ARCHIVED = ["data.json", "degen.json"];
 // the on-chain books were stopped 2026-07-20; a returning visitor whose stored
 // tab points at one would otherwise land on a book that never updates again
@@ -328,6 +341,7 @@ function markTab() {
   $("tabBnA").style.cssText = "cursor:pointer;background:none;" + (dataFile === "bnaggr.json" ? active : "");
   $("tabBnD").style.cssText = "cursor:pointer;background:none;" + (dataFile === "bndegen.json" ? active : "");
   $("tabRh").style.cssText = "cursor:pointer;background:none;" + (dataFile === "rh.json" ? active : "");
+  $("tabMai").style.cssText = "cursor:pointer;background:none;" + (dataFile === "mai.json" ? active : "");
 }
 window.switchProfile = f => {
   dataFile = f;
