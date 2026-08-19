@@ -71,6 +71,11 @@
   .empty { padding: 18px 14px; color: var(--text-muted); }
   .note { color: var(--text-muted); font-size: 12px; margin-top: 6px; }
   .err { color: var(--warning); padding: 12px 0; }
+.srcbadge{display:inline-block;margin-right:6px;padding:0 5px;border-radius:3px;
+  font-size:10px;line-height:16px;background:#333;color:#aaa;vertical-align:1px}
+.srcbadge.llm{background:#1d3b2a;color:#5fd39a}
+.note{color:var(--text-muted);font-size:12px;margin:-6px 0 8px}
+.muted{color:var(--text-muted)}
 </style>
 </head>
 <body>
@@ -108,6 +113,7 @@
 <div class="tablewrap"><div id="trades" class="empty">—</div></div>
 
 <h2>最近被拒 Top 25（按 1h 成交量）</h2>
+<p class="note" id="aiNote"></p>
 <div class="tablewrap"><div id="rejects" class="empty">—</div></div>
 
 <div class="err" id="err" hidden></div>
@@ -268,6 +274,26 @@ function render(d) {
   // 其余账本落 undefined —— 显示 "—" 而不是空白，免得看起来像渲染坏了
   const KIND = { mm: "🎩庄盘", pvp: "⚔️PVP", abandoned: "💀弃盘", unknown: "？未知" };
   const kindNote = c => (c.second_leg ? "🔁二段 " : "") + (KIND[c.table_kind] || "—");
+  // 叙事类型（麦总第三篇）：四类叙事的持有时长与止盈节奏完全不同，
+  // 只显示热度不显示类型的话，看不出一笔单为什么用了那套梯子
+  const NAR = { hotspot: "突发", classic: "经典", original: "原创",
+                derivative: "龙二" };
+  // AI 评价（INV-106：source 必须在 UI 可见，永不显示空评价）
+  const aiCell = c => {
+    const r = c.ai_review;
+    if (!r || !r.text) return `<span class="muted">—</span>`;
+    const llm = r.source === "llm";
+    const badge = llm ? "AI" : "规则";
+    const tip = llm ? "DeepSeek 生成"
+                    : `规则模板降级：${r.downgrade_reason || "未知"}`;
+    return `<span class="srcbadge${llm ? " llm" : ""}" title="${tip}">${badge}</span>`
+      + `<span title="${tip}">${r.text}</span>`;
+  };
+  const narNote = c => {
+    const base = (c.narrative ?? "—") + (c.narrative_strength >= 0.3 ? "🔥" : "");
+    const k = NAR[c.narrative_kind];
+    return k ? `${base} · ${k}` : base;
+  };
   // perp candidates carry a different shape entirely (range/heat/OI instead of
   // pool depth/age), so they get their own columns rather than empty cells
   const candRows = isPerp ? (d.candidates || []).map(c =>
@@ -285,17 +311,18 @@ function render(d) {
       `<td>${gradeNote[c.grade] ?? c.grade ?? "—"}</td>` +
       `<td>${c.score.toFixed(0)}</td>` +
       `<td>${kindNote(c)}</td>` +
-      `<td>${c.narrative ?? "—"}${c.narrative_strength >= 0.3 ? "🔥" : ""}</td>` +
+      `<td>${narNote(c)}</td>` +
       `<td>结构${c.structure_hits ?? 0}·传播${c.propagation_hits ?? 0}</td>` +
       `<td>${price(s.price_usd)}</td>` +
       `<td>${fmtK(s.liquidity_usd)}</td><td>${fmtK(s.market_cap_usd || s.fdv_usd)}</td>` +
       `<td>${age((s.fetched_at - s.pair_created_at) / 3600)}</td>` +
       `<td class="${cls(s.price_change_h1)}">${fmtPct(s.price_change_h1)}</td>` +
-      `<td>${(s.buys_h1 / Math.max(1, s.sells_h1)).toFixed(2)}</td></tr>`;
+      `<td>${(s.buys_h1 / Math.max(1, s.sells_h1)).toFixed(2)}</td>` +
+      `<td style="text-align:left;max-width:340px">${aiCell(c)}</td></tr>`;
   });
   setTable("candidates", isPerp
     ? table(["标的", "评分", "24h涨跌", "振幅", "广场热度", "OI变化", "24h成交额", "理由"], candRows)
-    : table(["币", "等级", "评分", "盘口", "叙事", "证据", "价格", "流动性", "市值", "币龄", "1h涨跌", "买/卖比"], candRows),
+    : table(["币", "等级", "评分", "盘口", "叙事", "证据", "价格", "流动性", "市值", "币龄", "1h涨跌", "买/卖比", "AI 评价"], candRows),
     isPerp ? "本轮无候选 — 没有标的同时通过方向门、波动与热度检查"
            : "本轮无候选 — 没有标的同时通过流动性、安全与动量检查");
 
@@ -319,11 +346,18 @@ function render(d) {
     return `<tr><td class="sym"><a href="${dexUrl(s.address, s.chain)}" target="_blank" rel="noopener">${s.symbol}</a>${chainTag(s.chain)}</td>` +
       `<td>${fmtK(s.volume_h1)}</td><td>${fmtK(s.liquidity_usd)}</td>` +
       `<td class="${cls(s.price_change_h1)}">${fmtPct(s.price_change_h1)}</td>` +
-      `<td class="reason" title="${r.reason}">${r.reason}</td></tr>`;
+      `<td>${age((s.fetched_at - s.pair_created_at) / 3600)}</td>` +
+      `<td>${narNote(r)}</td>` +
+      `<td class="reason" title="${r.reason}">${r.reason}</td>` +
+      `<td style="text-align:left;max-width:320px">${aiCell(r)}</td></tr>`;
   });
+  // 免责声明来自引擎产物，前端不自拟（INV-105：由代码拼接，不靠模型也不靠前端）
+  const note = $("aiNote");
+  if (note) note.textContent = d.ai_disclaimer || "";
   // no reject feed on the perp venue — the funnel scores everything it sees
   setTable("rejects", table(
-    ["币", "1h成交量", "流动性", "1h涨跌", "拒绝原因"], isPerp ? [] : rejRows),
+    ["币", "1h成交量", "流动性", "1h涨跌", "币龄", "叙事", "拒绝原因", "AI 评价"],
+    isPerp ? [] : rejRows),
     isPerp ? "币安永续账本无落选榜（筛选器对全部标的评分，不做硬拒绝）" : "—");
 }
 
