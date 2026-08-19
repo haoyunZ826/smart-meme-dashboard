@@ -76,6 +76,8 @@
 .srcbadge.llm{background:#1d3b2a;color:#5fd39a}
 .note{color:var(--text-muted);font-size:12px;margin:-6px 0 8px}
 .muted{color:var(--text-muted)}
+.hotchip{display:inline-block;padding:0 5px;border-radius:3px;font-size:10px;
+  background:#3a2d10;color:#e0b95f}
 </style>
 </head>
 <body>
@@ -101,6 +103,10 @@
 
 <h2>热门叙事（24h 观察池板块热度）</h2>
 <div class="tablewrap"><div id="narratives" class="empty">—</div></div>
+
+<h2 id="hotH2" hidden>链外热点词（Google Trends / Wikipedia / Yahoo / CoinGecko）</h2>
+<p class="note" id="hotNote" hidden>只列有「焦点源」背书的词——纯出现在新闻标题里的不算热点，只算用词。</p>
+<div class="tablewrap" id="hotWrap" hidden><div id="hotwords" class="empty">—</div></div>
 
 <h2>持仓 <span id="posCount"></span></h2>
 <div class="tablewrap"><div id="positions" class="empty">—</div></div>
@@ -235,7 +241,9 @@ function render(d) {
   const narNote = c => {
     const base = (c.narrative ?? "—") + (c.narrative_strength >= 0.3 ? "🔥" : "");
     const k = NAR[c.narrative_kind];
-    return k ? `${base} · ${k}` : base;
+    const hw = c.hot_word
+      ? ` <span class="hotchip" title="链外热点，权重 ${c.hot_weight ?? "?"}">🌐${c.hot_word}</span>` : "";
+    return (k ? `${base} · ${k}` : base) + hw;
   };
   // perp candidates carry a different shape entirely (range/heat/OI instead of
   // pool depth/age), so they get their own columns rather than empty cells
@@ -373,6 +381,18 @@ function render(d) {
       `<td class="reason" title="${r.reason}">${r.reason}</td>` +
       `<td style="text-align:left;max-width:320px">${aiCell(r)}</td></tr>`;
   });
+  // 链外热点词：唯一一个不来自链上量价的入场变量
+  const hot = d.hotwords || [];
+  const SRC_ZH = { trends: "搜索", wiki: "维基", yahoo: "美股", gecko: "币圈",
+                   headline: "新闻" };
+  ["hotH2", "hotNote", "hotWrap"].forEach(id => {
+    const e = $(id); if (e) e.hidden = !hot.length;
+  });
+  if (hot.length) setTable("hotwords", table(["热点词", "权重", "来源"],
+    hot.map(h => `<tr><td class="sym">${h.word}</td>` +
+      `<td style="text-align:left;font-family:monospace">${heatBar(Math.min(1, h.weight / 5))}</td>` +
+      `<td>${(h.sources || []).map(x => SRC_ZH[x] || x).join(" · ")}</td></tr>`)), "—");
+
   // 免责声明来自引擎产物，前端不自拟（INV-105：由代码拼接，不靠模型也不靠前端）
   const note = $("aiNote");
   if (note) note.textContent = d.ai_disclaimer || "";
