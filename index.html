@@ -228,10 +228,17 @@ function render(d) {
       `<td>${price(p.entry_price)}</td><td>${price(p.last_price)}</td>` +
       `<td class="${cls(marginPnl)}">${fmtPct(marginPnl)}</td>` +
       `<td>${fmtUsd(value)}</td><td>${fmtUsd(margin)}</td>` +
-      `<td>${mult.toFixed(2)}x</td><td>${p.moonbag ? "🌙 moonbag" : (p.tp_levels_hit || []).length + " TP"}</td></tr>`;
+      `<td>${mult.toFixed(2)}x</td><td>${p.moonbag ? "🌙 moonbag" : (p.tp_levels_hit || []).length + " TP"}</td>` +
+      (isPerp ? "" :
+        `<td>${narNote(p)}</td>` +
+        `<td>${kindNote(p)}</td>` +
+        `<td style="text-align:left;max-width:300px">${aiCell(p)}</td>`) + `</tr>`;
   });
   setTable("positions", table(
-    ["币", "入场价", "现价", "浮盈亏(保证金)", "名义", "保证金", "价格倍数", "阶段"], posRows),
+    isPerp
+      ? ["币", "入场价", "现价", "浮盈亏(保证金)", "名义", "保证金", "价格倍数", "阶段"]
+      : ["币", "入场价", "现价", "浮盈亏(保证金)", "名义", "保证金", "价格倍数",
+         "阶段", "叙事", "盘口", "AI 评价"], posRows),
     "暂无持仓");
 
   const heatBar = v => {
@@ -240,13 +247,21 @@ function render(d) {
   };
   // the perp book's equivalent of narratives is Square ticker heat: a flat
   // frequency list, no member coins to expand
+  // 这个 h2 是两种表共用的槽位。原来只在 isPerp 分支里改，切回链上账本从不
+  // 还原 ⇒ 链上账本的叙事表长期顶着「币安广场热度」的标题（实测 mai 页如此）。
+  // 两边都显式写，避免任何「上一次是谁」的残留状态
+  const narH2 = document.querySelector("h2");
+  if (narH2) narH2.textContent = isPerp
+    ? "币安广场热度（ticker 提及频次）"
+    : "热门叙事（点击展开成员币）";
   if (isPerp) {
-    document.querySelector("h2").textContent = "币安广场热度（ticker 提及频次）";
     const heatRows = (d.heat || []).map(([sym, n]) =>
       `<tr><td class="sym">$${sym}</td><td>${n}</td></tr>`);
     setTable("narratives", table(["Ticker", "提及次数"], heatRows),
              "本轮未抓到广场热度");
   }
+  const NARK = { hotspot: "突发", classic: "经典", original: "原创",
+                 derivative: "龙二" };
   const narRows = isPerp ? [] : (d.narratives || []).flatMap((n, i) => {
     const label = n.narrative.startsWith("~") ? "🆕 " + n.narrative.slice(1) : n.narrative;
     const chips = (n.members || []).map(m =>
@@ -258,6 +273,7 @@ function render(d) {
     return [
       `<tr onclick="toggleNar(${i}, '${n.narrative.replace(/'/g, "")}')" style="cursor:pointer">` +
       `<td class="sym"><span id="narArrow${i}" style="color:var(--text-muted)">${open ? "▾" : "▸"}</span> ${label}</td>` +
+      `<td>${NARK[n.kind] || "—"}</td>` +
       `<td style="text-align:left;font-family:monospace">${heatBar(n.strength)}</td>` +
       `<td>${n.tokens}</td><td>${fmtK(n.volume_h1)}</td>` +
       `<td class="${cls(n.median_h1_pct)}">${fmtPct(n.median_h1_pct)}</td></tr>`,
@@ -266,7 +282,8 @@ function render(d) {
     ];
   });
   if (!isPerp) setTable("narratives", table(
-    ["叙事（点击展开成员币）", "热度", "币数", "1h合计成交", "1h涨跌中位"], narRows),
+    ["叙事（点击展开成员币）", "类型", "热度", "币数", "1h合计成交", "1h涨跌中位"],
+    narRows),
     "观察池尚未积累足够叙事数据（需要几轮扫描）");
 
   const gradeNote = { S: "S·满仓买", A: "A·6成仓", B: "B·仅观察" };
