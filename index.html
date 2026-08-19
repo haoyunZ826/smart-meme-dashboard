@@ -208,6 +208,38 @@ function render(d) {
   const dd = d.dd_reports || {};
   const ddLink = a => dd[a]
     ? ` <a href="dd/${encodeURIComponent(dd[a])}" target="_blank" rel="noopener" title="尽调报告">📋</a>` : "";
+  // 这几个渲染助手被持仓表、候选表、被拒表**三处**共用，必须定义在
+  // 最靠前的那处（持仓）之前。放在候选表那段会让持仓表撞上 const 的
+  // 暂时性死区，整页 JS 挂掉——线上实测报 "Cannot access 'narNote'
+  // before initialization"，五张表全空只剩一行错误。
+  const gradeNote = { S: "S·满仓买", A: "A·6成仓", B: "B·仅观察" };
+  // 盘口画像（麦总方法论，见引擎 tablekind.py）。只有 mai 账本会填这个字段，
+  // 其余账本落 undefined —— 显示 "—" 而不是空白，免得看起来像渲染坏了
+  const KIND = { mm: "🎩庄盘", pvp: "⚔️PVP", abandoned: "💀弃盘", unknown: "？未知" };
+  const kindNote = c => (c.second_leg ? "🔁二段 " : "") + (KIND[c.table_kind] || "—");
+  // 叙事类型（麦总第三篇）：四类叙事的持有时长与止盈节奏完全不同，
+  // 只显示热度不显示类型的话，看不出一笔单为什么用了那套梯子
+  const NAR = { hotspot: "突发", classic: "经典", original: "原创",
+                derivative: "龙二" };
+  // AI 评价（INV-106：source 必须在 UI 可见，永不显示空评价）
+  const aiCell = c => {
+    const r = c.ai_review;
+    if (!r || !r.text) return `<span class="muted">—</span>`;
+    const llm = r.source === "llm";
+    const badge = llm ? "AI" : "规则";
+    const tip = llm ? "DeepSeek 生成"
+                    : `规则模板降级：${r.downgrade_reason || "未知"}`;
+    return `<span class="srcbadge${llm ? " llm" : ""}" title="${tip}">${badge}</span>`
+      + `<span title="${tip}">${r.text}</span>`;
+  };
+  const narNote = c => {
+    const base = (c.narrative ?? "—") + (c.narrative_strength >= 0.3 ? "🔥" : "");
+    const k = NAR[c.narrative_kind];
+    return k ? `${base} · ${k}` : base;
+  };
+  // perp candidates carry a different shape entirely (range/heat/OI instead of
+  // pool depth/age), so they get their own columns rather than empty cells
+
   const posRows = positions.map(p => {
     const mult = p.last_price / p.entry_price;
     const pnl = (mult - 1) * 100;
@@ -286,33 +318,6 @@ function render(d) {
     narRows),
     "观察池尚未积累足够叙事数据（需要几轮扫描）");
 
-  const gradeNote = { S: "S·满仓买", A: "A·6成仓", B: "B·仅观察" };
-  // 盘口画像（麦总方法论，见引擎 tablekind.py）。只有 mai 账本会填这个字段，
-  // 其余账本落 undefined —— 显示 "—" 而不是空白，免得看起来像渲染坏了
-  const KIND = { mm: "🎩庄盘", pvp: "⚔️PVP", abandoned: "💀弃盘", unknown: "？未知" };
-  const kindNote = c => (c.second_leg ? "🔁二段 " : "") + (KIND[c.table_kind] || "—");
-  // 叙事类型（麦总第三篇）：四类叙事的持有时长与止盈节奏完全不同，
-  // 只显示热度不显示类型的话，看不出一笔单为什么用了那套梯子
-  const NAR = { hotspot: "突发", classic: "经典", original: "原创",
-                derivative: "龙二" };
-  // AI 评价（INV-106：source 必须在 UI 可见，永不显示空评价）
-  const aiCell = c => {
-    const r = c.ai_review;
-    if (!r || !r.text) return `<span class="muted">—</span>`;
-    const llm = r.source === "llm";
-    const badge = llm ? "AI" : "规则";
-    const tip = llm ? "DeepSeek 生成"
-                    : `规则模板降级：${r.downgrade_reason || "未知"}`;
-    return `<span class="srcbadge${llm ? " llm" : ""}" title="${tip}">${badge}</span>`
-      + `<span title="${tip}">${r.text}</span>`;
-  };
-  const narNote = c => {
-    const base = (c.narrative ?? "—") + (c.narrative_strength >= 0.3 ? "🔥" : "");
-    const k = NAR[c.narrative_kind];
-    return k ? `${base} · ${k}` : base;
-  };
-  // perp candidates carry a different shape entirely (range/heat/OI instead of
-  // pool depth/age), so they get their own columns rather than empty cells
   const candRows = isPerp ? (d.candidates || []).map(c =>
       `<tr><td class="sym">${c.symbol}</td>` +
       `<td>${c.score.toFixed(0)}</td>` +
