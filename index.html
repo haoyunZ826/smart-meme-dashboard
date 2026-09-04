@@ -71,6 +71,13 @@
   .empty { padding: 18px 14px; color: var(--text-muted); }
   .note { color: var(--text-muted); font-size: 12px; margin-top: 6px; }
   .err { color: var(--warning); padding: 12px 0; }
+.srcbadge{display:inline-block;margin-right:6px;padding:0 5px;border-radius:3px;
+  font-size:10px;line-height:16px;background:#333;color:#aaa;vertical-align:1px}
+.srcbadge.llm{background:#1d3b2a;color:#5fd39a}
+.note{color:var(--text-muted);font-size:12px;margin:-6px 0 8px}
+.muted{color:var(--text-muted)}
+.hotchip{display:inline-block;padding:0 5px;border-radius:3px;font-size:10px;
+  background:#3a2d10;color:#e0b95f}
 </style>
 </head>
 <body>
@@ -83,6 +90,7 @@
     <button class="badge" id="tabBnA" style="cursor:pointer;background:none" onclick="switchProfile('bnaggr.json', this)">⚡ 激进</button>
     <button class="badge" id="tabBnD" style="cursor:pointer;background:none" onclick="switchProfile('bndegen.json', this)">🎰 赌徒</button>
     <button class="badge" id="tabRh" style="cursor:pointer;background:none" onclick="switchProfile('rh.json', this)">🏹 RH链</button>
+    <button class="badge" id="tabMai" style="cursor:pointer;background:none" onclick="switchProfile('mai.json', this)">🎭 盘口</button>
     <span style="width:10px"></span>
     <button class="badge archived" id="tabAgg" style="cursor:pointer;background:none" onclick="switchProfile('data.json', this)">⚡ 链上·存档</button>
     <button class="badge archived" id="tabDegen" style="cursor:pointer;background:none" onclick="switchProfile('degen.json', this)">🎰 链上·存档</button>
@@ -96,6 +104,10 @@
 <h2>热门叙事（24h 观察池板块热度）</h2>
 <div class="tablewrap"><div id="narratives" class="empty">—</div></div>
 
+<h2 id="hotH2" hidden>链外热点词（Google Trends / Wikipedia / Yahoo / CoinGecko）</h2>
+<p class="note" id="hotNote" hidden>只列有「焦点源」背书的词——纯出现在新闻标题里的不算热点，只算用词。</p>
+<div class="tablewrap" id="hotWrap" hidden><div id="hotwords" class="empty">—</div></div>
+
 <h2>持仓 <span id="posCount"></span></h2>
 <div class="tablewrap"><div id="positions" class="empty">—</div></div>
 
@@ -107,6 +119,7 @@
 <div class="tablewrap"><div id="trades" class="empty">—</div></div>
 
 <h2>最近被拒 Top 25（按 1h 成交量）</h2>
+<p class="note" id="aiNote"></p>
 <div class="tablewrap"><div id="rejects" class="empty">—</div></div>
 
 <div class="err" id="err" hidden></div>
@@ -166,11 +179,18 @@ function render(d) {
   $("updated").textContent = (archived ? "⏹ 已停机 · 数据停在 " : "数据时间 ")
     + new Date(d.ts * 1000).toLocaleString("zh-CN");
   const ch = d.channels || {};
+  // 只列这一轮**实际启用**的通道。写死全部九个的老版本在 mai 账本上全显示 0
+  // （它只开 gmgn_rank 一条），读起来像 feed 坏了
+  const CH_LABEL = {
+    dexscreener_boosts: "boosts", dexscreener_profiles: "profiles",
+    gecko_new_pools: "新池", gecko_trending: "热门",
+    jupiter_recent: "jup新币", pumpfun_graduations: "毕业",
+    helius_new_pools: "helius新池", kol_x: "KOL喊单", square: "广场",
+    gmgn_rank: "GMGN榜",
+  };
   const chStr = Object.keys(ch).length
-    ? `　·　通道: boosts ${ch.dexscreener_boosts ?? 0} / profiles ${ch.dexscreener_profiles ?? 0}` +
-      ` / 新池 ${ch.gecko_new_pools ?? 0} / 热门 ${ch.gecko_trending ?? 0}` +
-      ` / jup新币 ${ch.jupiter_recent ?? 0} / 毕业 ${ch.pumpfun_graduations ?? 0}` +
-      ` / helius新池 ${ch.helius_new_pools ?? 0} / KOL喊单 ${ch.kol_x ?? 0} / 广场 ${ch.square ?? 0}` +
+    ? `　·　通道: ` + Object.keys(ch)
+        .map(k => `${CH_LABEL[k] || k} ${ch[k] ?? 0}`).join(" / ") +
       `　·　观察池 ${d.watchlist ?? "—"}`
     : "";
   const tradeable = d.tradeable != null ? `（可交易 ${d.tradeable}，其余为曲线期）` : "";
@@ -194,6 +214,40 @@ function render(d) {
   const dd = d.dd_reports || {};
   const ddLink = a => dd[a]
     ? ` <a href="dd/${encodeURIComponent(dd[a])}" target="_blank" rel="noopener" title="尽调报告">📋</a>` : "";
+  // 这几个渲染助手被持仓表、候选表、被拒表**三处**共用，必须定义在
+  // 最靠前的那处（持仓）之前。放在候选表那段会让持仓表撞上 const 的
+  // 暂时性死区，整页 JS 挂掉——线上实测报 "Cannot access 'narNote'
+  // before initialization"，五张表全空只剩一行错误。
+  const gradeNote = { S: "S·满仓买", A: "A·6成仓", B: "B·仅观察" };
+  // 盘口画像（麦总方法论，见引擎 tablekind.py）。只有 mai 账本会填这个字段，
+  // 其余账本落 undefined —— 显示 "—" 而不是空白，免得看起来像渲染坏了
+  const KIND = { mm: "🎩庄盘", pvp: "⚔️PVP", abandoned: "💀弃盘", unknown: "？未知" };
+  const kindNote = c => (c.second_leg ? "🔁二段 " : "") + (KIND[c.table_kind] || "—");
+  // 叙事类型（麦总第三篇）：四类叙事的持有时长与止盈节奏完全不同，
+  // 只显示热度不显示类型的话，看不出一笔单为什么用了那套梯子
+  const NAR = { hotspot: "突发", classic: "经典", original: "原创",
+                derivative: "龙二" };
+  // AI 评价（INV-106：source 必须在 UI 可见，永不显示空评价）
+  const aiCell = c => {
+    const r = c.ai_review;
+    if (!r || !r.text) return `<span class="muted">—</span>`;
+    const llm = r.source === "llm";
+    const badge = llm ? "AI" : "规则";
+    const tip = llm ? "DeepSeek 生成"
+                    : `规则模板降级：${r.downgrade_reason || "未知"}`;
+    return `<span class="srcbadge${llm ? " llm" : ""}" title="${tip}">${badge}</span>`
+      + `<span title="${tip}">${r.text}</span>`;
+  };
+  const narNote = c => {
+    const base = (c.narrative ?? "—") + (c.narrative_strength >= 0.3 ? "🔥" : "");
+    const k = NAR[c.narrative_kind];
+    const hw = c.hot_word
+      ? ` <span class="hotchip" title="链外热点，权重 ${c.hot_weight ?? "?"}">🌐${c.hot_word}</span>` : "";
+    return (k ? `${base} · ${k}` : base) + hw;
+  };
+  // perp candidates carry a different shape entirely (range/heat/OI instead of
+  // pool depth/age), so they get their own columns rather than empty cells
+
   const posRows = positions.map(p => {
     const mult = p.last_price / p.entry_price;
     const pnl = (mult - 1) * 100;
@@ -214,10 +268,17 @@ function render(d) {
       `<td>${price(p.entry_price)}</td><td>${price(p.last_price)}</td>` +
       `<td class="${cls(marginPnl)}">${fmtPct(marginPnl)}</td>` +
       `<td>${fmtUsd(value)}</td><td>${fmtUsd(margin)}</td>` +
-      `<td>${mult.toFixed(2)}x</td><td>${p.moonbag ? "🌙 moonbag" : (p.tp_levels_hit || []).length + " TP"}</td></tr>`;
+      `<td>${mult.toFixed(2)}x</td><td>${p.moonbag ? "🌙 moonbag" : (p.tp_levels_hit || []).length + " TP"}</td>` +
+      (isPerp ? "" :
+        `<td>${narNote(p)}</td>` +
+        `<td>${kindNote(p)}</td>` +
+        `<td style="text-align:left;max-width:300px">${aiCell(p)}</td>`) + `</tr>`;
   });
   setTable("positions", table(
-    ["币", "入场价", "现价", "浮盈亏(保证金)", "名义", "保证金", "价格倍数", "阶段"], posRows),
+    isPerp
+      ? ["币", "入场价", "现价", "浮盈亏(保证金)", "名义", "保证金", "价格倍数", "阶段"]
+      : ["币", "入场价", "现价", "浮盈亏(保证金)", "名义", "保证金", "价格倍数",
+         "阶段", "叙事", "盘口", "AI 评价"], posRows),
     "暂无持仓");
 
   const heatBar = v => {
@@ -226,13 +287,21 @@ function render(d) {
   };
   // the perp book's equivalent of narratives is Square ticker heat: a flat
   // frequency list, no member coins to expand
+  // 这个 h2 是两种表共用的槽位。原来只在 isPerp 分支里改，切回链上账本从不
+  // 还原 ⇒ 链上账本的叙事表长期顶着「币安广场热度」的标题（实测 mai 页如此）。
+  // 两边都显式写，避免任何「上一次是谁」的残留状态
+  const narH2 = document.querySelector("h2");
+  if (narH2) narH2.textContent = isPerp
+    ? "币安广场热度（ticker 提及频次）"
+    : "热门叙事（点击展开成员币）";
   if (isPerp) {
-    document.querySelector("h2").textContent = "币安广场热度（ticker 提及频次）";
     const heatRows = (d.heat || []).map(([sym, n]) =>
       `<tr><td class="sym">$${sym}</td><td>${n}</td></tr>`);
     setTable("narratives", table(["Ticker", "提及次数"], heatRows),
              "本轮未抓到广场热度");
   }
+  const NARK = { hotspot: "突发", classic: "经典", original: "原创",
+                 derivative: "龙二" };
   const narRows = isPerp ? [] : (d.narratives || []).flatMap((n, i) => {
     const label = n.narrative.startsWith("~") ? "🆕 " + n.narrative.slice(1) : n.narrative;
     const chips = (n.members || []).map(m =>
@@ -244,6 +313,7 @@ function render(d) {
     return [
       `<tr onclick="toggleNar(${i}, '${n.narrative.replace(/'/g, "")}')" style="cursor:pointer">` +
       `<td class="sym"><span id="narArrow${i}" style="color:var(--text-muted)">${open ? "▾" : "▸"}</span> ${label}</td>` +
+      `<td>${NARK[n.kind] || "—"}</td>` +
       `<td style="text-align:left;font-family:monospace">${heatBar(n.strength)}</td>` +
       `<td>${n.tokens}</td><td>${fmtK(n.volume_h1)}</td>` +
       `<td class="${cls(n.median_h1_pct)}">${fmtPct(n.median_h1_pct)}</td></tr>`,
@@ -252,12 +322,10 @@ function render(d) {
     ];
   });
   if (!isPerp) setTable("narratives", table(
-    ["叙事（点击展开成员币）", "热度", "币数", "1h合计成交", "1h涨跌中位"], narRows),
+    ["叙事（点击展开成员币）", "类型", "热度", "币数", "1h合计成交", "1h涨跌中位"],
+    narRows),
     "观察池尚未积累足够叙事数据（需要几轮扫描）");
 
-  const gradeNote = { S: "S·满仓买", A: "A·6成仓", B: "B·仅观察" };
-  // perp candidates carry a different shape entirely (range/heat/OI instead of
-  // pool depth/age), so they get their own columns rather than empty cells
   const candRows = isPerp ? (d.candidates || []).map(c =>
       `<tr><td class="sym">${c.symbol}</td>` +
       `<td>${c.score.toFixed(0)}</td>` +
@@ -272,17 +340,19 @@ function render(d) {
     return `<tr><td class="sym"><a href="${dexUrl(s.address, s.chain)}" target="_blank" rel="noopener">${s.symbol}</a>${chainTag(s.chain)}${ddLink(s.address)}</td>` +
       `<td>${gradeNote[c.grade] ?? c.grade ?? "—"}</td>` +
       `<td>${c.score.toFixed(0)}</td>` +
-      `<td>${c.narrative ?? "—"}${c.narrative_strength >= 0.3 ? "🔥" : ""}</td>` +
+      `<td>${kindNote(c)}</td>` +
+      `<td>${narNote(c)}</td>` +
       `<td>结构${c.structure_hits ?? 0}·传播${c.propagation_hits ?? 0}</td>` +
       `<td>${price(s.price_usd)}</td>` +
       `<td>${fmtK(s.liquidity_usd)}</td><td>${fmtK(s.market_cap_usd || s.fdv_usd)}</td>` +
       `<td>${age((s.fetched_at - s.pair_created_at) / 3600)}</td>` +
       `<td class="${cls(s.price_change_h1)}">${fmtPct(s.price_change_h1)}</td>` +
-      `<td>${(s.buys_h1 / Math.max(1, s.sells_h1)).toFixed(2)}</td></tr>`;
+      `<td>${(s.buys_h1 / Math.max(1, s.sells_h1)).toFixed(2)}</td>` +
+      `<td style="text-align:left;max-width:340px">${aiCell(c)}</td></tr>`;
   });
   setTable("candidates", isPerp
     ? table(["标的", "评分", "24h涨跌", "振幅", "广场热度", "OI变化", "24h成交额", "理由"], candRows)
-    : table(["币", "等级", "评分", "叙事", "证据", "价格", "流动性", "市值", "币龄", "1h涨跌", "买/卖比"], candRows),
+    : table(["币", "等级", "评分", "盘口", "叙事", "证据", "价格", "流动性", "市值", "币龄", "1h涨跌", "买/卖比", "AI 评价"], candRows),
     isPerp ? "本轮无候选 — 没有标的同时通过方向门、波动与热度检查"
            : "本轮无候选 — 没有标的同时通过流动性、安全与动量检查");
 
@@ -306,15 +376,34 @@ function render(d) {
     return `<tr><td class="sym"><a href="${dexUrl(s.address, s.chain)}" target="_blank" rel="noopener">${s.symbol}</a>${chainTag(s.chain)}</td>` +
       `<td>${fmtK(s.volume_h1)}</td><td>${fmtK(s.liquidity_usd)}</td>` +
       `<td class="${cls(s.price_change_h1)}">${fmtPct(s.price_change_h1)}</td>` +
-      `<td class="reason" title="${r.reason}">${r.reason}</td></tr>`;
+      `<td>${age((s.fetched_at - s.pair_created_at) / 3600)}</td>` +
+      `<td>${narNote(r)}</td>` +
+      `<td class="reason" title="${r.reason}">${r.reason}</td>` +
+      `<td style="text-align:left;max-width:320px">${aiCell(r)}</td></tr>`;
   });
+  // 链外热点词：唯一一个不来自链上量价的入场变量
+  const hot = d.hotwords || [];
+  const SRC_ZH = { trends: "搜索", wiki: "维基", yahoo: "美股", gecko: "币圈",
+                   headline: "新闻" };
+  ["hotH2", "hotNote", "hotWrap"].forEach(id => {
+    const e = $(id); if (e) e.hidden = !hot.length;
+  });
+  if (hot.length) setTable("hotwords", table(["热点词", "权重", "来源"],
+    hot.map(h => `<tr><td class="sym">${h.word}</td>` +
+      `<td style="text-align:left;font-family:monospace">${heatBar(Math.min(1, h.weight / 5))}</td>` +
+      `<td>${(h.sources || []).map(x => SRC_ZH[x] || x).join(" · ")}</td></tr>`)), "—");
+
+  // 免责声明来自引擎产物，前端不自拟（INV-105：由代码拼接，不靠模型也不靠前端）
+  const note = $("aiNote");
+  if (note) note.textContent = d.ai_disclaimer || "";
   // no reject feed on the perp venue — the funnel scores everything it sees
   setTable("rejects", table(
-    ["币", "1h成交量", "流动性", "1h涨跌", "拒绝原因"], isPerp ? [] : rejRows),
+    ["币", "1h成交量", "流动性", "1h涨跌", "币龄", "叙事", "拒绝原因", "AI 评价"],
+    isPerp ? [] : rejRows),
     isPerp ? "币安永续账本无落选榜（筛选器对全部标的评分，不做硬拒绝）" : "—");
 }
 
-const LIVE = ["bn.json", "bnaggr.json", "bndegen.json", "rh.json"];
+const LIVE = ["bn.json", "bnaggr.json", "bndegen.json", "rh.json", "mai.json"];
 const ARCHIVED = ["data.json", "degen.json"];
 // the on-chain books were stopped 2026-07-20; a returning visitor whose stored
 // tab points at one would otherwise land on a book that never updates again
@@ -328,6 +417,7 @@ function markTab() {
   $("tabBnA").style.cssText = "cursor:pointer;background:none;" + (dataFile === "bnaggr.json" ? active : "");
   $("tabBnD").style.cssText = "cursor:pointer;background:none;" + (dataFile === "bndegen.json" ? active : "");
   $("tabRh").style.cssText = "cursor:pointer;background:none;" + (dataFile === "rh.json" ? active : "");
+  $("tabMai").style.cssText = "cursor:pointer;background:none;" + (dataFile === "mai.json" ? active : "");
 }
 window.switchProfile = f => {
   dataFile = f;
